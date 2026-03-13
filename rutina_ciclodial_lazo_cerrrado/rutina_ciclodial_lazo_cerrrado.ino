@@ -15,7 +15,7 @@ Servo gripper;
 // --- VARIABLES DE MEMORIA DE POSICIÓN (Trayectoria) ---
 float pos_base = 90.0;
 float pos_hombro = 90.0;
-float pos_codo = 90.0; // Este es ahora el SETPOINT del PID
+float pos_codo = 0; // Este es ahora el SETPOINT del PID
 float pos_mun_der = 90.0;
 float pos_mun_izq = 90.0;
 int ap_gripper = 10;
@@ -30,7 +30,7 @@ int ax_o, ay_o, az_o; int gx_o, gy_o, gz_o;
 float ang_x;
 float ang_x_prev = 0;
 
-// --- VARIABLES DEL CONTROLADOR PI (CODO) ---
+// --- Variables de control ---
 float Kp = 0.0935588; 
 float Ki = 0.1192379; 
 float error_integral = 0.0;
@@ -72,17 +72,26 @@ void loop() {
 
   // Paso 2. Llevar el brazo antes de su extension maxima
   Serial.println("350 mm.");
-  moverCicloidal(pos_base, 39, 30, pos_mun_der, pos_mun_izq, 1.5);
+  moverCicloidal(pos_base, 55, -20.5, pos_mun_der, pos_mun_izq, 1.5);
+  delay(2000);
+  Serial.println("aaaaaaaaaaaa");
+  moverCicloidal(pos_base, 39, 10, pos_mun_der, pos_mun_izq, 1.5);
+  delay(2000);
 
   // Paso 3. Ajusta codo para recoger la pieza
   Serial.println("Inclinando muñeca hacia abajo...");
-  moverCicloidal(pos_base, pos_hombro, 29, pos_mun_der, pos_mun_izq, 1.5);
+  moverCicloidal(pos_base, pos_hombro, 0, pos_mun_der, pos_mun_izq, 1.5);
+  delay(1000);
   
   // Paso 4. Baja muneca
   moverCicloidal(pos_base, pos_hombro, pos_codo, 0, 180, 1.5);
   
   // Paso 5. Baja hombro para recoger la pieza
-  moverCicloidal(pos_base, 23, pos_codo, pos_mun_der, pos_mun_izq, 1.5);
+  Serial.println("bbbbbbb");
+  moverCicloidal(pos_base, pos_hombro, 12, pos_mun_der, pos_mun_izq, 1.5);
+  delay(1000);
+  Serial.println("ccccccc");
+  moverCicloidal(pos_base, 23, 20, pos_mun_der, pos_mun_izq, 1.5);
   esperarActivo(1500); // Damos tiempo a estabilizarse
 
   // Paso 6. Cierre de pinza
@@ -93,7 +102,7 @@ void loop() {
 
   // Paso 7. Sube brazo tras recoger la pieza
   Serial.println("Subiendo brazo");
-  moverCicloidal(pos_base, 50, pos_codo, pos_mun_der, pos_mun_izq, 1.5);
+  moverCicloidal(pos_base, pos_hombro, 0, pos_mun_der, pos_mun_izq, 1.5);
 
   // Paso 8. Girar base
   Serial.println("Moviendo base");
@@ -101,11 +110,11 @@ void loop() {
 
   // Paso 9. Llevar el brazo a posicion de 150mm girando muneca
   Serial.println("150 mm.");
-  moverCicloidal(pos_base, 77, 100, 60, 120, 1.5);
+  moverCicloidal(pos_base, 77, -57, 60, 120, 1.5);
   esperarActivo(1500);
   
   // Paso 10. Baja el codo para dejar la pieza
-  moverCicloidal(pos_base, pos_hombro, 131, pos_mun_der, pos_mun_izq, 1.5);
+  moverCicloidal(pos_base, pos_hombro, -70, pos_mun_der, pos_mun_izq, 1.5);
   esperarActivo(1000);
 
   // Paso 11. Apertura de pinza
@@ -116,14 +125,15 @@ void loop() {
 
   // Paso 12. Levantar hombro y dejar codo en Home
   Serial.println("Levantando brazo");
-  moverCicloidal(pos_base, 77, 90, pos_mun_der, pos_mun_izq, 1.5);
+  moverCicloidal(pos_base, 77, 0, pos_mun_der, pos_mun_izq, 1.5);
 
   // Paso 13. Regresar a Home
   Serial.println("Regresando a Home");
-  moverCicloidal(pos_base, 90, pos_codo, pos_mun_der, pos_mun_izq, 1.5);
+  moverCicloidal(pos_base, 90, 0, pos_mun_der, pos_mun_izq, 1.5);
   
   // Paso 14. Girar base a Home
-  moverCicloidal(90, pos_hombro, pos_codo, pos_mun_der, pos_mun_izq, 1.5);
+  moverCicloidal(90, pos_hombro, 0, pos_mun_der, pos_mun_izq, 1.5);
+  delay(1000);
 
   // Paso 15. Centrar la muñeca
   Serial.println("Centrando muñecas");
@@ -144,11 +154,12 @@ void esperarActivo(int milisegundos) {
   }
 }
 
-// 2. CONTROLADOR PID + FEEDFORWARD (Se ejecuta cientos de veces por segundo)
-void actualizarPID_Codo(float setpoint_actual) {
+// Control PI
+void actualizarPID_Codo(float setpoint_mpu) {
   float dt_pid = (millis() - tiempo_prev_pid) / 1000.0;
   tiempo_prev_pid = millis();
 
+  // 1. Lectura del sensor
   sensor.getAcceleration(&ax, &ay, &az);
   sensor.getRotation(&gx, &gy, &gz);
   
@@ -158,24 +169,25 @@ void actualizarPID_Codo(float setpoint_actual) {
   if (isnan(ang_x)) { ang_x = 0; }
   ang_x_prev = ang_x;
 
-  // TRADUCCIÓN GEOMÉTRICA (El desfase inverso que descubriste)
-  float input_mapeado = 90.0 - ang_x;
-
-  // Cálculo del error
-  float error = setpoint_actual - input_mapeado;
+  // 2. Cálculo del error 
+  float error = setpoint_mpu - ang_x;
+  
   float P = Kp * error;
   
   error_integral = error_integral + (error * dt_pid);
   float I = Ki * error_integral;
   
-  // Anti-windup (Ajustado para permitir un esfuerzo máximo de +-30 grados)
+  // Anti-windup 
   if (I > 30) I = 30;
   else if (I < -30) I = -30;
 
-  // FEEDFORWARD: Sumamos el esfuerzo PID a la trayectoria deseada
-  float output = setpoint_actual + P + I;
+  // 3. Feedforward
+  float feedforward_servo = 90.0 - setpoint_mpu;
 
-  // Protección de hardware
+  // 4. Calculo de la salida
+  float output = feedforward_servo - (P + I);
+
+  // Protección de hardware del servo
   if (output > 180) output = 180;
   else if (output < 0) output = 0;
 
