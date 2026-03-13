@@ -35,10 +35,6 @@
 
 #include <Servo.h>
 
-// Resto de tu código...
-
-#include <Servo.h>
-
 Servo hombro;
 Servo codo;
 Servo mun_der;
