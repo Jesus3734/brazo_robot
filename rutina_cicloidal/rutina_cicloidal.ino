@@ -142,15 +142,15 @@ void loop() {
   moverCicloidal(pos_base, 77, 90, pos_mun_der, pos_mun_izq, 2);
   delay(1000);
 
-  // Paso 12. Regresar a Home del hombro
+  // Paso 14. Regresar a Home del hombro
   moverCicloidal(pos_base, 90, pos_codo, pos_mun_der, pos_mun_izq, 1);
   delay(500);
   
-  // Paso 13. Girar base a Home
+  // Paso 15. Girar base a Home
   moverCicloidal(55, pos_hombro, pos_codo, pos_mun_der, pos_mun_izq, 2.5);
   delay(500);
 
-  // Paso 14. Centrar la muñeca en su posición de Home
+  // Paso 16. Centrar la muñeca en su posición de Home
   moverCicloidal(pos_base, pos_hombro, pos_codo, 180, 0, 2.5);
   delay(1000);
   
