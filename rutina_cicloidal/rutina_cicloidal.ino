@@ -131,7 +131,7 @@ void loop() {
 
   // Paso 12. Apertura del gripper
   Serial.println("Abriendo gripper");
-      for (int g = 50; g >= 10; g--) {   // OJO: g-- (Restando) y la condición es g >= 10
+      for (int g = 50; g >= 10; g--) {   
         gripper.write(g);
         delay(15); 
       }
